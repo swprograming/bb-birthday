@@ -182,7 +182,7 @@ export default function App() {
               Her Name
             </p>
             <p className="mt-2 text-xl font-semibold text-purple-900">
-              Bezawit
+              Bezawit Nigusse
             </p>
           </div>
 
