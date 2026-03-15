@@ -77,25 +77,29 @@ export default function App() {
   }, []);
 
   const toggleMusic = async () => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
 
     try {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        await audioRef.current.play();
+      if (audio.paused) {
+        await audio.play();
         setIsPlaying(true);
+      } else {
+        audio.pause();
+        setIsPlaying(false);
       }
     } catch (error) {
       console.error("Audio play failed:", error);
-      alert("Put your song in public/music/love-song.mp3");
+      alert(
+        "Your iPhone could not play this song file. Try replacing it with a new MP3 or M4A file."
+      );
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-violet-100 via-purple-50 to-pink-50 text-slate-800">
-      <audio ref={audioRef} loop>
+      <audio ref={audioRef} preload="metadata" playsInline loop>
+        <source src="/music/love-song.m4a" type="audio/mp4" />
         <source src="/music/love-song.mp3" type="audio/mpeg" />
       </audio>
 
@@ -178,7 +182,7 @@ export default function App() {
               Her Name
             </p>
             <p className="mt-2 text-xl font-semibold text-purple-900">
-              Bezawit Nigusse
+              Bezawit
             </p>
           </div>
 
@@ -330,9 +334,6 @@ export default function App() {
         {photos.length === 0 ? (
           <div className="rounded-[2rem] bg-white/80 p-8 text-center shadow-xl">
             <p className="text-xl font-bold text-purple-700">No photos found</p>
-            <p className="mt-2 text-slate-600">
-              Add files like photo1.jpg, photo2.jpg, photo3.jpg in src/assets
-            </p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -345,7 +346,7 @@ export default function App() {
                   <img
                     src={photo}
                     alt={`Memory ${index + 1}`}
-                    className="h-full w-full object-cover transition duration-500 hover:scale-105"
+                    className="h-full w-full object-cover"
                   />
                 </div>
 
