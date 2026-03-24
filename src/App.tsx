@@ -160,7 +160,6 @@ function ScratchCard({ message }: { message: string }) {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    // silver scratch layer
     const grad = ctx.createLinearGradient(0, 0, W, H);
     grad.addColorStop(0, "#c4b5fd");
     grad.addColorStop(0.5, "#e9d5ff");
@@ -207,7 +206,6 @@ function ScratchCard({ message }: { message: string }) {
     ctx.fill();
     lastPos.current = { x, y };
 
-    // measure revealed
     const data = ctx.getImageData(0, 0, W, H).data;
     let cleared = 0;
     for (let i = 3; i < data.length; i += 4) if (data[i] === 0) cleared++;
@@ -222,7 +220,6 @@ function ScratchCard({ message }: { message: string }) {
         className="relative rounded-2xl overflow-hidden shadow-xl"
         style={{ width: W, maxWidth: "100%", touchAction: "none" }}
       >
-        {/* hidden message underneath */}
         <div
           className="absolute inset-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 px-4 text-center"
           style={{ zIndex: 0 }}
@@ -329,8 +326,6 @@ function HugButton() {
   );
 }
 
-// ─── Birthday Gate ─────────────────────────────────────────────────────────────
-
 function BirthdayGate({ onUnlock }: { onUnlock: () => void }) {
   const [month, setMonth] = useState("");
   const [day, setDay] = useState("");
@@ -348,6 +343,7 @@ function BirthdayGate({ onUnlock }: { onUnlock: () => void }) {
     const d = parseInt(day);
     if (m === HER_BIRTHDAY_MONTH && d === HER_BIRTHDAY_DAY) {
       setUnlocking(true);
+      // Give the animation time to play before officially unlocking
       setTimeout(onUnlock, 900);
     } else {
       setError(true);
@@ -364,7 +360,6 @@ function BirthdayGate({ onUnlock }: { onUnlock: () => void }) {
         background: "linear-gradient(160deg, #1e0533 0%, #2d0a4e 40%, #3b0764 70%, #1a0a2e 100%)",
       }}
     >
-      {/* Stars */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {Array.from({ length: 50 }).map((_, i) => (
           <div
@@ -467,7 +462,17 @@ export default function App() {
   const [timeTogether, setTimeTogether] = useState<TimeTogether>(getTimeTogether());
   const [isPlaying, setIsPlaying] = useState(false);
   const [showLetter, setShowLetter] = useState(false);
+
+  // NEW: Jukebox State
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // NEW: Your playlist
+  const playlist = useMemo(() => [
+    { title: "Our Love Song", file: "/music/love-song.mp3" },
+    { title: "You Are My Everything", file: "/music/love-song2.mp3" },
+    { title: "Beautiful BB", file: "/music/love-song3.mp3" }
+  ], []);
 
   const photoModules = import.meta.glob("./assets/photo*.{jpg,jpeg,png,webp}", {
     eager: true,
@@ -484,19 +489,52 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const handleUnlock = () => {
+  const handleUnlock = async () => {
     setUnlocked(true);
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 5000);
+
+    // Auto-play music instantly on unlock
+    if (audioRef.current) {
+      try {
+        await audioRef.current.play();
+        setIsPlaying(true);
+      } catch (err) {
+        console.log("Autoplay was blocked by the browser until further interaction.", err);
+      }
+    }
   };
 
   const toggleMusic = async () => {
     const audio = audioRef.current;
     if (!audio) return;
     try {
-      if (audio.paused) { await audio.play(); setIsPlaying(true); }
-      else { audio.pause(); setIsPlaying(false); }
-    } catch { setIsPlaying(false); }
+      if (audio.paused) {
+        await audio.play();
+        setIsPlaying(true);
+      } else {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    } catch {
+      setIsPlaying(false);
+    }
+  };
+
+  const changeSong = (direction: "next" | "prev") => {
+    let newIndex = currentSongIndex;
+    if (direction === "next") {
+      newIndex = (currentSongIndex + 1) % playlist.length;
+    } else {
+      newIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
+    }
+    setCurrentSongIndex(newIndex);
+
+    if (isPlaying && audioRef.current) {
+      setTimeout(() => {
+        audioRef.current?.play().catch(() => setIsPlaying(false));
+      }, 50);
+    }
   };
 
   return (
@@ -504,34 +542,54 @@ export default function App() {
       {!unlocked && <BirthdayGate onUnlock={handleUnlock} />}
 
       {unlocked && (
-        <div className="min-h-screen bg-gradient-to-b from-violet-100 via-purple-50 to-pink-50 text-slate-800">
-          <audio ref={audioRef} preload="metadata" playsInline loop>
-            <source src="/music/love-song.m4a" type="audio/mp4" />
-            <source src="/music/love-song.mp3" type="audio/mpeg" />
-          </audio>
+        <div className="min-h-screen bg-gradient-to-b from-violet-100 via-purple-50 to-pink-50 text-slate-800 pb-20">
 
-          {/* Confetti */}
+          <audio
+            ref={audioRef}
+            src={playlist[currentSongIndex].file}
+            preload="metadata"
+            playsInline
+            onEnded={() => changeSong("next")}
+          />
+
           {showConfetti && <ConfettiLayer pieces={confettiPieces} />}
-
-          {/* Floating hearts always */}
           <FloatingHearts hearts={hearts} />
 
-          {/* Ambient blobs */}
           <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
             <div className="absolute left-[-40px] top-10 h-40 w-40 rounded-full bg-purple-300/30 blur-3xl" />
             <div className="absolute right-[-30px] top-52 h-44 w-44 rounded-full bg-pink-300/30 blur-3xl" />
             <div className="absolute bottom-32 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-violet-300/20 blur-3xl" />
           </div>
 
-          {/* Music button */}
-          <button
-            onClick={toggleMusic}
-            className="fixed bottom-4 right-4 z-50 rounded-full bg-purple-700 px-5 py-3 text-sm font-semibold text-white shadow-2xl transition active:scale-95"
-          >
-            {isPlaying ? "Pause Song ⏸️" : "Play Song 🎵"}
-          </button>
+          {/* NEW: Floating Mini Jukebox */}
+          <div className="fixed bottom-6 left-1/2 z-50 flex w-[90%] max-w-sm -translate-x-1/2 items-center gap-3 rounded-[2rem] border border-purple-200 bg-white/90 px-4 py-3 shadow-2xl backdrop-blur-md transition-all">
+            <div
+              className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-purple-900 to-slate-800 p-1 shadow-inner ${isPlaying ? 'animate-spin' : ''}`}
+              style={{ animationDuration: '4s' }}
+            >
+              <div className="flex h-full w-full items-center justify-center rounded-full border border-gray-600 bg-gray-900">
+                <div className="h-3 w-3 rounded-full bg-pink-400"></div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="truncate text-sm font-extrabold text-purple-900">
+                {playlist[currentSongIndex].title}
+              </p>
+              <p className="text-xs font-semibold text-purple-500">BB's Playlist 🌸</p>
+            </div>
+            <div className="flex items-center gap-2 text-purple-700">
+              <button onClick={() => changeSong("prev")} className="p-2 text-lg transition active:scale-75">
+                ⏮️
+              </button>
+              <button onClick={toggleMusic} className="p-2 text-2xl transition active:scale-75 drop-shadow-md">
+                {isPlaying ? "⏸️" : "▶️"}
+              </button>
+              <button onClick={() => changeSong("next")} className="p-2 text-lg transition active:scale-75">
+                ⏭️
+              </button>
+            </div>
+          </div>
 
-          {/* ── Hero ── */}
           <section className="relative mx-auto max-w-5xl px-4 pb-10 pt-8 sm:px-6 z-10">
             <div className="rounded-[2rem] bg-white/80 p-5 shadow-xl backdrop-blur sm:p-8">
               <div className="mb-4 inline-block rounded-full bg-purple-100 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-purple-700">
@@ -557,7 +615,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* ── Info cards ── */}
           <section className="mx-auto max-w-5xl px-4 py-2 sm:px-6 z-10 relative">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
@@ -573,7 +630,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* ── Love Counter ── */}
           <section id="counter" className="mx-auto max-w-5xl px-4 py-12 sm:px-6 z-10 relative">
             <div className="rounded-[2rem] bg-white/85 p-5 shadow-2xl backdrop-blur sm:p-8">
               <p className="text-sm font-bold uppercase tracking-[0.22em] text-purple-500">Our Love Counter</p>
@@ -601,7 +657,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* ── Scratch Card ── */}
           <section className="mx-auto max-w-5xl px-4 py-2 sm:px-6 z-10 relative">
             <div className="rounded-[2rem] bg-white/85 p-5 shadow-2xl backdrop-blur sm:p-8">
               <p className="text-sm font-bold uppercase tracking-[0.22em] text-purple-500">A Secret Message</p>
@@ -610,7 +665,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* ── Hug Button ── */}
           <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 z-10 relative">
             <div className="rounded-[2rem] bg-white/85 p-5 shadow-2xl backdrop-blur sm:p-8 text-center">
               <p className="text-sm font-bold uppercase tracking-[0.22em] text-purple-500">For When You Miss Me</p>
@@ -619,7 +673,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* ── Letter ── */}
           <section className="mx-auto max-w-5xl px-4 py-2 sm:px-6 z-10 relative">
             <div className="rounded-[2rem] bg-white/85 p-5 shadow-2xl backdrop-blur sm:p-8">
               <div className="flex items-center justify-between gap-4">
@@ -645,7 +698,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* ── Gallery ── */}
           <section id="gallery" className="mx-auto max-w-5xl px-4 py-14 sm:px-6 z-10 relative">
             <div className="mb-8 text-center">
               <p className="text-sm font-bold uppercase tracking-[0.22em] text-purple-500">Our Memories</p>
@@ -680,7 +732,6 @@ export default function App() {
             )}
           </section>
 
-          {/* ── Footer ── */}
           <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 z-10 relative">
             <div className="rounded-[2rem] bg-purple-900 px-6 py-12 text-center text-white shadow-2xl sm:px-10 sm:py-14">
               <p className="text-sm font-bold uppercase tracking-[0.22em] text-purple-200">Forever Message</p>
